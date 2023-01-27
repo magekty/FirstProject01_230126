@@ -7,6 +7,7 @@ TagManager:
   - Can be picked up
   - Can be interact_A
   - Can be interact_B
+  - Melee
   layers:
   - Default
   - TransparentFX

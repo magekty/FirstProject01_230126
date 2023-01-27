@@ -8,16 +8,24 @@ public class PlayerMoveController : MonoBehaviour
 {
     [SerializeField] private float moveSpeed = 5f;
     [SerializeField] private float rotationSpeed = 3f;
+    [SerializeField] private GameObject meleeAttackGo = null;
+    [SerializeField] private float kickSpeed = 5f;
+    [SerializeField] private float forcePower = 0.01f;
+
 
     private List<Collider> colList = new List<Collider>();
     private Camera cm = null;
     private CharacterController cc = null;
     private Vector3 movePoint;
+    private Vector3 attackLocalPos;
     private Collider closeCollider = null;
     private GameObject meatGo = null;
 
     private bool isHandEmpty = true;
     private bool isFull = false;
+    private bool isPunch = false;
+    private bool isAttacked = false;
+    private bool isMove = false;
 
     private int money = 0;
     private float countDeley = 0f;
@@ -27,14 +35,22 @@ public class PlayerMoveController : MonoBehaviour
     private float tempBuyMeatDeley = 0f;
     private float tempCookDeley = 0f;
     private float tempFullDeley = 0f;
+    private float tempMeleeDeley = 0f;
+    private float tempAttackedDeley = 0f;
+
+
 
 
     private void Awake()
     {
-        movePoint = transform.position;
+        movePoint = GetPos();
         cc = GetComponent<CharacterController>();
         cm = Camera.main;
 
+    }
+    private void Start()
+    {
+        attackLocalPos = GetAttackPos();
     }
 
     private void Update()
@@ -42,6 +58,7 @@ public class PlayerMoveController : MonoBehaviour
         countDeley += Time.deltaTime;
         // 우클릭 이동함수
         InputMouseRightClick();
+        InputMouseLeftClick();
         // Q버튼 누르면 줍기, 버리기 함수
         InputKeyboardQ();
         InputKeyboardE();
@@ -51,6 +68,39 @@ public class PlayerMoveController : MonoBehaviour
     {
         if (isFull && countDeley - tempFullDeley > 60f)
             isFull = false;
+    }
+    private void InputMouseLeftClick()
+    {
+        if (Input.GetMouseButtonUp(0) && !isPunch)
+        {
+            meleeAttackGo.SetActive(true);
+            tempMeleeDeley = countDeley;
+            StartCoroutine("MeleeAttack");
+            isPunch = true;
+        }
+
+
+    }
+
+    private IEnumerator MeleeAttack()
+    {
+        float t = 0f ;
+        while (true)
+        {
+            t += Time.deltaTime;
+            meleeAttackGo.transform.localPosition = Vector3.Lerp(attackLocalPos, 
+                attackLocalPos + Vector3.forward, t * kickSpeed);
+            if (isPunch && countDeley - tempMeleeDeley > 1f)
+            {
+                StopCoroutine("MeleeAttack");
+                meleeAttackGo.SetActive(false);
+                isPunch = false;
+                meleeAttackGo.transform.localPosition = attackLocalPos;
+
+            }
+            //meleeAttackGo.transform.Translate(Vector3.forward * Time.deltaTime * punchSpeed);
+            yield return null;
+        }
     }
     private void InputKeyboardE()
     {
@@ -132,8 +182,39 @@ public class PlayerMoveController : MonoBehaviour
                 tempCookDeley = countDeley;
             }
         }
-
+        if (_other.CompareTag("Melee"))
+        {
+            Debug.Log("melee");
+            isAttacked = true;
+            Vector3 a = (transform.position - _other.transform.position) * forcePower;
+            a.y = 0;
+            tempAttackedDeley = countDeley;
+            StartCoroutine("AttackedAfter", a);
+            isMove = false;
+        }
+        if (!_other.CompareTag("Player"))
+        {
+            isMove = false;
+        }
     }
+    private IEnumerator AttackedAfter(Vector3 _a)
+    {
+        float t = 0f;
+        while (true)
+        {
+            t += Time.deltaTime;
+            this.transform.Translate(_a);
+            Debug.Log("Start");
+            if (isAttacked && countDeley - tempAttackedDeley > 1f)
+            {
+                StopCoroutine("AttackedAfter");
+                Debug.Log("Stop");
+                isAttacked = false;
+            }
+            yield return null;
+        }
+    }
+
     private void OnTriggerExit(Collider _other)
     {
         if (_other.CompareTag("Can be picked up"))
@@ -218,12 +299,12 @@ public class PlayerMoveController : MonoBehaviour
                 movePoint = raycastHit.point;
                 //Debug.Log("movePoint : " + movePoint.ToString());
                 //Debug.Log("맞은 객체 : " + raycastHit.transform.name);
-
+                isMove = true;
             }
         }
 
         // 목적지까지 거리가 0.1f 보다 멀다면
-        if (Vector3.Distance(GetPos(), movePoint) > 0.1f)
+        if (isMove && Vector3.Distance(GetPos(), movePoint) > 0.2f)
         {
             // 이동
             Move();
@@ -232,6 +313,11 @@ public class PlayerMoveController : MonoBehaviour
 
     private void Move()
     {
+        if (Vector3.Distance(GetPos(), movePoint) < 1.9f)
+        {
+            isMove = false;
+            Debug.Log("MoveStop");
+        }
         // thisUpdatePoint 는 이번 업데이트(프레임) 에서 이동할 포인트를 담는 변수다.
         // 이동할 방향(이동할 곳-현재 위치) 곱하기 속도를 해서 이동할 위치값을 계산한다.
         Vector3 thisUpdatePoint = (movePoint - transform.position).normalized * moveSpeed;
@@ -239,6 +325,7 @@ public class PlayerMoveController : MonoBehaviour
         // simpleMove 는 자동으로 중력을 계산해서 이동시켜주는 메소드다.
         // 값으로 이동할 포인트를 전달해주면 된다.
         cc.SimpleMove(thisUpdatePoint);
+        Debug.Log($"curPos : {GetPos()} movePos : {movePoint}");
         thisUpdatePoint.y = 0f;
         // 간단한 화면 회전
         //transform.LookAt(thisUpdatePoint);
@@ -246,11 +333,17 @@ public class PlayerMoveController : MonoBehaviour
         // Lerp를 이용한 부드러운 화면 회전
         Quaternion targetRot = Quaternion.LookRotation(thisUpdatePoint);
         transform.rotation = Quaternion.Lerp(transform.rotation, targetRot, Time.deltaTime * rotationSpeed);
+
     }
 
     private Vector3 GetPos()
     {
         return transform.position;
+    }
+
+    private Vector3 GetAttackPos()
+    {
+        return meleeAttackGo.transform.localPosition;
     }
 
 
