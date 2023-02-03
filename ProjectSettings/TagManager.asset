@@ -5,9 +5,12 @@ TagManager:
   serializedVersion: 2
   tags:
   - Can be picked up
-  - Can be interact_A
-  - Can be interact_B
   - Melee
+  - Can be interact_B
+  - Can be interact_A
+  - SearchParticle
+  - Bullet
+  - Floor
   layers:
   - Default
   - TransparentFX
@@ -15,8 +18,8 @@ TagManager:
   - 
   - Water
   - UI
-  - 
-  - 
+  - test1
+  - test2
   - 
   - 
   - 
